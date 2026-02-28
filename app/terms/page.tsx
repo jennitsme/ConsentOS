@@ -7,7 +7,7 @@ export default function TermsOfService() {
         <section>
           <h2 className="text-xl font-semibold text-white mb-3">1. Acceptance of Terms</h2>
           <p>
-            By accessing and using ConsentOS ("the Service"), you agree to be bound by these Terms of Service. 
+            By accessing and using ConsentOS (&quot;the Service&quot;), you agree to be bound by these Terms of Service. 
             If you do not agree to these terms, please do not use the Service.
           </p>
         </section>
@@ -41,7 +41,7 @@ export default function TermsOfService() {
         <section>
           <h2 className="text-xl font-semibold text-white mb-3">5. Disclaimer of Warranties</h2>
           <p>
-            The Service is provided "as is" and "as available" without any warranties of any kind, 
+            The Service is provided &quot;as is&quot; and &quot;as available&quot; without any warranties of any kind, 
             either express or implied. We do not guarantee that the Service will be uninterrupted, 
             secure, or error-free.
           </p>

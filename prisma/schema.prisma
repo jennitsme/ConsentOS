@@ -22,6 +22,8 @@ model User {
   connections   Connection[]
   permissions   Permission[]
   activityLogs  ActivityLog[]
+  dataCategories DataCategory[]
+  transactions   Transaction[]
 }
 
 model Connection {
@@ -48,6 +50,21 @@ model Permission {
   updatedAt    DateTime @updatedAt
 }
 
+model DataCategory {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  description  String
+  source       String
+  level        String   // 'denied', 'restricted', 'monetized'
+  price        Float?   @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, name])
+}
+
 model ActivityLog {
   id           String   @id @default(cuid())
   userId       String
@@ -55,5 +72,16 @@ model ActivityLog {
   appName      String
   action       String   // 'Requested access to public tweets'
   status       String   // 'approved', 'denied', 'active', 'blocked'
+  createdAt    DateTime @default(now())
+}
+
+model Transaction {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String   // 'payment', 'withdrawal'
+  source       String   // 'OpenAI', 'GPT-4', 'Bank Account'
+  amount       Float
+  status       String   // 'completed', 'pending', 'failed'
   createdAt    DateTime @default(now())
 }

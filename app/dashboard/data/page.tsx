@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Shield, Lock, Unlock, DollarSign, Search, Filter, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Shield, Lock, Unlock, DollarSign, Search, Filter, AlertCircle, Loader2 } from 'lucide-react';
 import * as motion from 'motion/react-client';
 
 type PermissionLevel = 'denied' | 'restricted' | 'monetized';
@@ -15,26 +15,61 @@ interface DataCategory {
   price?: number;
 }
 
-const initialData: DataCategory[] = [
-  { id: '1', name: 'Public Tweets', description: 'All public text posts on Twitter/X', source: 'Twitter', level: 'monetized', price: 0.5 },
-  { id: '2', name: 'Private Photos', description: 'Photos stored in Google Photos', source: 'Google', level: 'denied' },
-  { id: '3', name: 'Voice Notes', description: 'Audio recordings from WhatsApp', source: 'Meta', level: 'denied' },
-  { id: '4', name: 'Code Repositories', description: 'Public code on GitHub', source: 'GitHub', level: 'restricted' },
-  { id: '5', name: 'Blog Posts', description: 'Articles published on Medium', source: 'Medium', level: 'monetized', price: 1.2 },
-];
-
 export default function DataPermissions() {
-  const [data, setData] = useState<DataCategory[]>(initialData);
+  const [data, setData] = useState<DataCategory[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const updatePermission = (id: string, newLevel: PermissionLevel) => {
-    setData(data.map(item => item.id === id ? { ...item, level: newLevel } : item));
+  useEffect(() => {
+    fetchPermissions();
+  }, []);
+
+  const fetchPermissions = async () => {
+    try {
+      const res = await fetch('/api/data-permissions');
+      const result = await res.json();
+      if (result.categories) {
+        setData(result.categories);
+      }
+    } catch (error) {
+      console.error('Failed to fetch permissions:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updatePermission = async (id: string, newLevel: PermissionLevel, price?: number) => {
+    // Optimistic update
+    const oldData = [...data];
+    setData(data.map(item => item.id === id ? { ...item, level: newLevel, price: price ?? item.price } : item));
+
+    try {
+      const res = await fetch('/api/data-permissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, level: newLevel, price }),
+      });
+      
+      if (!res.ok) throw new Error('Failed to update');
+    } catch (error) {
+      console.error('Failed to update permission:', error);
+      setData(oldData); // Rollback
+    }
   };
 
   const filteredData = data.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.source.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        <p className="text-zinc-400 animate-pulse">Loading data categories...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -117,6 +152,7 @@ export default function DataPermissions() {
                 <input 
                   type="number" 
                   defaultValue={item.price}
+                  onBlur={(e) => updatePermission(item.id, 'monetized', parseFloat(e.target.value))}
                   className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white w-full focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                   placeholder="0.00"
                 />

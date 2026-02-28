@@ -71,13 +71,30 @@ export default function DashboardOverview() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  const handleRevokeAll = () => {
+  const handleRevokeAll = async () => {
+    if (!confirm('Are you sure you want to revoke ALL data access and disconnect all accounts? This action cannot be undone.')) {
+      return;
+    }
+
     setIsRevoking(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/revoke-all', {
+        method: 'POST',
+      });
+
+      if (res.ok) {
+        // Refresh all dashboard data
+        await fetchData();
+        alert('All access has been successfully revoked.');
+      } else {
+        throw new Error('Failed to revoke access');
+      }
+    } catch (error) {
+      console.error('Error revoking all access:', error);
+      alert('Failed to revoke all access. Please try again.');
+    } finally {
       setIsRevoking(false);
-      setActivePermissions(0);
-      setRecentRequests(prev => prev.map(req => ({ ...req, status: 'blocked' })));
-    }, 2000);
+    }
   };
 
   const handleConnectSource = async (provider: string, type: string) => {
