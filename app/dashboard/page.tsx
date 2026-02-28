@@ -1,63 +1,74 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ShieldAlert, ShieldCheck, ShieldX, Activity, Database, ArrowRight, Zap, Link as LinkIcon, CheckCircle2, X, Plus } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, ShieldX, Activity, Database, ArrowRight, Zap, Link as LinkIcon, CheckCircle2, X, Plus, Loader2 } from 'lucide-react';
 import * as motion from 'motion/react-client';
 import { AnimatePresence } from 'motion/react';
-
-const possibleApps = ["Anthropic Claude", "Runway ML", "GitHub Copilot", "Meta AI", "Google Gemini", "Unknown Crawler", "DataBroker Inc."];
-const possibleActions = ["Requested access to blog posts", "Attempted to scrape profile", "Accessed code repositories", "Requested access to photos", "Accessed public tweets", "Requested email metadata"];
-const possibleStatuses: ('approved' | 'denied' | 'active' | 'blocked')[] = ["approved", "denied", "active", "blocked"];
 
 export default function DashboardOverview() {
   const [isRevoking, setIsRevoking] = useState(false);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
-  const [activePermissions, setActivePermissions] = useState(24);
-  const [dataPoints, setDataPoints] = useState(1432);
-  const [recentRequests, setRecentRequests] = useState([
-    { id: 1, app: "OpenAI (GPT-4)", action: "Requested access to public tweets", time: "Just now", status: "approved" as const },
-    { id: 2, app: "Midjourney", action: "Requested access to Instagram photos", time: "2 mins ago", status: "denied" as const },
-    { id: 3, app: "Grammarly", action: "Accessed Google Docs", time: "5 mins ago", status: "active" as const },
-    { id: 4, app: "Unknown AI Scraper", action: "Attempted to scrape LinkedIn profile", time: "10 mins ago", status: "blocked" as const },
-  ]);
+  
+  const [activePermissions, setActivePermissions] = useState(0);
+  const [dataPoints, setDataPoints] = useState(0);
+  const [recentRequests, setRecentRequests] = useState<any[]>([]);
+  const [connections, setConnections] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = async () => {
+    try {
+      const [statsRes, activityRes, connectionsRes] = await Promise.all([
+        fetch('/api/dashboard/stats'),
+        fetch('/api/dashboard/activity'),
+        fetch('/api/connections')
+      ]);
+
+      const statsData = await statsRes.json();
+      const activityData = await activityRes.json();
+      const connectionsData = await connectionsRes.json();
+
+      setActivePermissions(statsData.activePermissions || 0);
+      setDataPoints(statsData.dataPoints || 0);
+      
+      if (activityData.activity) {
+        setRecentRequests(activityData.activity.map((item: any) => ({
+          id: item.id,
+          app: item.appName,
+          action: item.action,
+          time: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: item.status
+        })));
+      }
+
+      if (connectionsData.connections) {
+        setConnections(connectionsData.connections);
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      // Simulate data points increasing
-      setDataPoints(prev => prev + Math.floor(Math.random() * 5) + 1);
-      
-      // Simulate active permissions fluctuating slightly
-      if (Math.random() > 0.7) {
-        setActivePermissions(prev => prev + (Math.random() > 0.5 ? 1 : -1));
-      }
+    fetchData();
 
-      // Simulate new incoming requests
-      if (Math.random() > 0.6) {
-        const newRequest = {
-          id: Date.now(),
-          app: possibleApps[Math.floor(Math.random() * possibleApps.length)],
-          action: possibleActions[Math.floor(Math.random() * possibleActions.length)],
-          time: "Just now",
-          status: possibleStatuses[Math.floor(Math.random() * possibleStatuses.length)],
-        };
-        
-        setRecentRequests(prev => {
-          const updated = [newRequest, ...prev].slice(0, 4);
-          // Update times for older requests
-          return updated.map((req, i) => {
-            if (i === 0) return req;
-            if (req.time === "Just now") return { ...req, time: "1 min ago" };
-            if (req.time.includes("min")) {
-              const mins = parseInt(req.time) + 1;
-              return { ...req, time: `${mins} mins ago` };
-            }
-            return req;
-          });
-        });
+    const handleMessage = (event: MessageEvent) => {
+      // Validate origin is from AI Studio preview or localhost
+      const origin = event.origin;
+      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+        return;
       }
-    }, 3000);
-
-    return () => clearInterval(interval);
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+        fetchData(); // Refresh data
+      }
+      if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+        console.error('OAuth Error:', event.data.error);
+        alert(`Authentication failed: ${event.data.error}`);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   const handleRevokeAll = () => {
@@ -68,6 +79,35 @@ export default function DashboardOverview() {
       setRecentRequests(prev => prev.map(req => ({ ...req, status: 'blocked' })));
     }, 2000);
   };
+
+  const handleConnectSource = async (provider: string, type: string) => {
+    try {
+      await fetch('/api/connections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider,
+          type,
+          status: 'connected'
+        }),
+      });
+      // Refresh data after connecting
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to connect source:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        <p className="text-zinc-400 animate-pulse">Loading your data footprint...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -101,7 +141,7 @@ export default function DashboardOverview() {
         <StatCard 
           title="Active Permissions" 
           value={activePermissions.toString()} 
-          trend="Live updating" 
+          trend="Live" 
           icon={<ShieldCheck className="w-5 h-5 text-emerald-400" />} 
           color="emerald"
         />
@@ -115,7 +155,7 @@ export default function DashboardOverview() {
         <StatCard 
           title="Data Points Tracked" 
           value={dataPoints.toLocaleString()} 
-          trend="Live updating" 
+          trend="Live" 
           icon={<Database className="w-5 h-5 text-blue-400" />} 
           color="blue"
         />
@@ -132,10 +172,28 @@ export default function DashboardOverview() {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <ConnectionCard name="Google Workspace" status="Connected" type="Email & Docs" lastSync="2 mins ago" />
-            <ConnectionCard name="Twitter / X" status="Connected" type="Social Posts" lastSync="1 hour ago" />
-            <ConnectionCard name="Dropbox" status="Connected" type="Files & Photos" lastSync="3 hours ago" />
-            <ConnectionCard name="Meta" status="Action Required" type="Social & Ads" lastSync="2 days ago" warning />
+            {connections.length > 0 ? (
+              connections.map((conn) => (
+                <ConnectionCard 
+                  key={conn.id}
+                  name={conn.provider} 
+                  status={conn.status === 'connected' ? 'Connected' : 'Action Required'} 
+                  type={conn.type} 
+                  lastSync={new Date(conn.lastSync).toLocaleDateString()} 
+                  warning={conn.status !== 'connected'} 
+                />
+              ))
+            ) : (
+              <div className="col-span-full p-8 text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
+                <p className="text-zinc-400 mb-4">No data sources connected yet.</p>
+                <button 
+                  onClick={() => setIsConnectModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Connect your first source
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -152,35 +210,43 @@ export default function DashboardOverview() {
           </div>
           
           <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-4 overflow-hidden relative">
-            {recentRequests.map((req, i) => (
-              <motion.div
-                key={req.id}
-                initial={{ opacity: 0, x: 20, height: 0 }}
-                animate={{ opacity: 1, x: 0, height: 'auto' }}
-                transition={{ duration: 0.3 }}
-              >
-                <ActivityItem 
-                  app={req.app} 
-                  action={req.action} 
-                  time={req.time} 
-                  status={req.status}
-                />
-              </motion.div>
-            ))}
+            {recentRequests.length > 0 ? (
+              recentRequests.map((req, i) => (
+                <motion.div
+                  key={req.id}
+                  initial={{ opacity: 0, x: 20, height: 0 }}
+                  animate={{ opacity: 1, x: 0, height: 'auto' }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ActivityItem 
+                    app={req.app} 
+                    action={req.action} 
+                    time={req.time} 
+                    status={req.status}
+                  />
+                </motion.div>
+              ))
+            ) : (
+              <p className="text-zinc-500 text-sm text-center py-4">No recent activity found.</p>
+            )}
           </div>
         </div>
       </div>
 
       <AnimatePresence>
         {isConnectModalOpen && (
-          <ConnectDataModal onClose={() => setIsConnectModalOpen(false)} />
+          <ConnectDataModal 
+            onClose={() => setIsConnectModalOpen(false)} 
+            onConnect={handleConnectSource}
+            existingConnections={connections.map(c => c.provider)}
+          />
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-function ConnectDataModal({ onClose }: { onClose: () => void }) {
+function ConnectDataModal({ onClose, onConnect, existingConnections }: { onClose: () => void, onConnect: (name: string, type: string) => Promise<void>, existingConnections: string[] }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <motion.div
@@ -201,30 +267,64 @@ function ConnectDataModal({ onClose }: { onClose: () => void }) {
         </div>
         
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          <SourceOption name="Google Workspace" type="Email, Docs, Drive" connected={true} />
-          <SourceOption name="Twitter / X" type="Social Posts, Interactions" connected={true} />
-          <SourceOption name="Dropbox" type="Files, Photos" connected={true} />
-          <SourceOption name="Meta" type="Facebook, Instagram, Ads" connected={false} />
-          <SourceOption name="GitHub" type="Code Repositories, Issues" connected={false} />
-          <SourceOption name="LinkedIn" type="Profile, Posts, Connections" connected={false} />
-          <SourceOption name="Spotify" type="Listening History, Playlists" connected={false} />
+          <SourceOption name="Google Workspace" type="Email, Docs, Drive" connected={existingConnections.includes("Google Workspace")} onConnect={onConnect} />
+          <SourceOption name="Twitter / X" type="Social Posts, Interactions" connected={existingConnections.includes("Twitter / X")} onConnect={onConnect} />
+          <SourceOption name="Dropbox" type="Files, Photos" connected={existingConnections.includes("Dropbox")} onConnect={onConnect} />
+          <SourceOption name="Meta" type="Facebook, Instagram, Ads" connected={existingConnections.includes("Meta")} onConnect={onConnect} />
+          <SourceOption name="GitHub" type="Code Repositories, Issues" connected={existingConnections.includes("GitHub")} onConnect={onConnect} />
+          <SourceOption name="LinkedIn" type="Profile, Posts, Connections" connected={existingConnections.includes("LinkedIn")} onConnect={onConnect} />
+          <SourceOption name="Spotify" type="Listening History, Playlists" connected={existingConnections.includes("Spotify")} onConnect={onConnect} />
         </div>
       </motion.div>
     </div>
   );
 }
 
-function SourceOption({ name, type, connected }: { name: string, type: string, connected: boolean }) {
+function SourceOption({ name, type, connected, onConnect }: { name: string, type: string, connected: boolean, onConnect: (name: string, type: string) => Promise<void> }) {
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(connected);
 
-  const handleConnect = () => {
-    if (isConnected) return;
+  const handleConnect = async () => {
+    if (connected) return;
     setIsConnecting(true);
-    setTimeout(() => {
+    try {
+      if (name === 'Google Workspace') {
+        const redirectUri = `${window.location.origin}/api/auth/google/callback`;
+        const response = await fetch(`/api/auth/google/url?redirectUri=${encodeURIComponent(redirectUri)}`);
+        if (!response.ok) throw new Error('Failed to get auth URL');
+        const { url } = await response.json();
+        
+        const authWindow = window.open(
+          url,
+          'oauth_popup',
+          'width=600,height=700'
+        );
+
+        if (!authWindow) {
+          alert('Please allow popups for this site to connect your account.');
+        }
+      } else if (name === 'Twitter / X') {
+        const redirectUri = `${window.location.origin}/api/auth/twitter/callback`;
+        const response = await fetch(`/api/auth/twitter/url?redirectUri=${encodeURIComponent(redirectUri)}`);
+        if (!response.ok) throw new Error('Failed to get auth URL');
+        const { url } = await response.json();
+        
+        const authWindow = window.open(
+          url,
+          'oauth_popup',
+          'width=600,height=700'
+        );
+
+        if (!authWindow) {
+          alert('Please allow popups for this site to connect your account.');
+        }
+      } else {
+        await onConnect(name, type);
+      }
+    } catch (error) {
+      console.error('Failed to connect:', error);
+    } finally {
       setIsConnecting(false);
-      setIsConnected(true);
-    }, 1500);
+    }
   };
 
   return (
@@ -240,16 +340,16 @@ function SourceOption({ name, type, connected }: { name: string, type: string, c
       </div>
       <button 
         onClick={handleConnect}
-        disabled={isConnected || isConnecting}
+        disabled={connected || isConnecting}
         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-          isConnected 
+          connected 
             ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
             : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
         }`}
       >
         {isConnecting ? (
           <><Activity className="w-4 h-4 animate-spin" /> Connecting...</>
-        ) : isConnected ? (
+        ) : connected ? (
           <><CheckCircle2 className="w-4 h-4" /> Connected</>
         ) : (
           <><Plus className="w-4 h-4" /> Connect</>
