@@ -66,8 +66,8 @@ export async function GET(request: Request) {
       throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange token');
     }
 
-    // Get user info
-    const userInfoResponse = await fetch('https://api.twitter.com/2/users/me', {
+    // Get user info with public metrics
+    const userInfoResponse = await fetch('https://api.twitter.com/2/users/me?user.fields=public_metrics', {
       headers: {
         Authorization: `Bearer ${tokenData.access_token}`,
       },
@@ -75,6 +75,7 @@ export async function GET(request: Request) {
 
     const userInfoData = await userInfoResponse.json();
     const userInfo = userInfoData.data;
+    const dataCount = userInfo.public_metrics?.tweet_count || 0;
 
     // Save to database
     let user = await prisma.user.findFirst();
@@ -98,6 +99,9 @@ export async function GET(request: Request) {
       update: {
         status: 'connected',
         type: 'Social Posts, Interactions',
+        accessToken: tokenData.access_token,
+        dataCount: dataCount,
+        privacyScore: 62, // Static for now
         lastSync: new Date(),
       },
       create: {
@@ -105,6 +109,9 @@ export async function GET(request: Request) {
         provider: 'Twitter / X',
         status: 'connected',
         type: 'Social Posts, Interactions',
+        accessToken: tokenData.access_token,
+        dataCount: dataCount,
+        privacyScore: 62,
       }
     });
 

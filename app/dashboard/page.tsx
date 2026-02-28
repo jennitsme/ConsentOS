@@ -409,6 +409,20 @@ function SourceOption({ name, type, connected, onConnect, onDisconnect }: { name
         if (!authWindow) {
           alert('Please allow popups for this site to connect your account.');
         }
+      } else if (name === 'GitHub') {
+        const response = await fetch(`/api/auth/github/url`);
+        if (!response.ok) throw new Error('Failed to get auth URL');
+        const { url } = await response.json();
+        
+        const authWindow = window.open(
+          url,
+          'oauth_popup',
+          'width=600,height=700'
+        );
+
+        if (!authWindow) {
+          alert('Please allow popups for this site to connect your account.');
+        }
       } else {
         await onConnect(name, type);
       }

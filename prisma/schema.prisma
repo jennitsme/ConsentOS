@@ -33,6 +33,7 @@ model Connection {
   provider     String   // 'google', 'twitter', 'dropbox', 'meta'
   status       String   // 'connected', 'action_required', 'disconnected'
   type         String   // 'Email & Docs', 'Social Posts', etc.
+  accessToken  String?  // Store OAuth access token for real data fetching
   privacyScore Int      @default(0)
   dataCount    Int      @default(0)
   lastSync     DateTime @default(now())

@@ -130,7 +130,54 @@ export async function GET() {
       orderBy: { updatedAt: 'desc' }
     });
 
-    return NextResponse.json({ connections });
+    // Attempt to refresh data counts for connections with access tokens
+    const updatedConnections = await Promise.all(connections.map(async (conn) => {
+      // Only refresh if it's been more than an hour since last sync to avoid rate limits
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      
+      if (conn.accessToken && conn.lastSync < oneHourAgo) {
+        try {
+          if (conn.provider === 'GitHub') {
+            const userResponse = await fetch('https://api.github.com/user', {
+              headers: { Authorization: `Bearer ${conn.accessToken}` },
+            });
+            if (userResponse.ok) {
+              const userData = await userResponse.json();
+              const newDataCount = userData.public_repos + (userData.total_private_repos || 0);
+              
+              if (newDataCount !== conn.dataCount) {
+                const updatedConn = await prisma.connection.update({
+                  where: { id: conn.id },
+                  data: { dataCount: newDataCount, lastSync: new Date() }
+                });
+                return updatedConn;
+              }
+            }
+          } else if (conn.provider === 'Twitter / X') {
+            const userResponse = await fetch('https://api.twitter.com/2/users/me?user.fields=public_metrics', {
+              headers: { Authorization: `Bearer ${conn.accessToken}` },
+            });
+            if (userResponse.ok) {
+              const userData = await userResponse.json();
+              const newDataCount = userData.data?.public_metrics?.tweet_count || conn.dataCount;
+              
+              if (newDataCount !== conn.dataCount) {
+                const updatedConn = await prisma.connection.update({
+                  where: { id: conn.id },
+                  data: { dataCount: newDataCount, lastSync: new Date() }
+                });
+                return updatedConn;
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to refresh data for ${conn.provider}:`, error);
+        }
+      }
+      return conn;
+    }));
+
+    return NextResponse.json({ connections: updatedConnections });
   } catch (error) {
     console.error('Error fetching connections:', error);
     return NextResponse.json({ error: 'Failed to fetch connections' }, { status: 500 });

@@ -6,7 +6,7 @@ export async function GET(req: Request) {
   const params = new URLSearchParams({
     client_id: process.env.GITHUB_CLIENT_ID || '',
     redirect_uri: redirectUri,
-    scope: 'user:email',
+    scope: 'user:email repo',
   });
 
   const authUrl = `https://github.com/login/oauth/authorize?${params}`;
