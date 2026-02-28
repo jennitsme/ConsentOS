@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { generateConsentHash } from '@/lib/hashing';
 
 const INITIAL_CATEGORIES = [
   { name: 'Public Tweets', description: 'All public text posts on Twitter/X', source: 'Twitter', level: 'monetized', price: 0.5 },
@@ -32,7 +33,8 @@ export async function GET() {
         prisma.dataCategory.create({
           data: {
             ...cat,
-            userId: user.id!
+            userId: user.id!,
+            consentHash: generateConsentHash(user.id!, cat.name, cat.level)
           }
         })
       ));
@@ -51,27 +53,37 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const { id, level, price } = await request.json();
+    const user = await prisma.user.findFirst();
     
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const current = await prisma.dataCategory.findUnique({ where: { id } });
+    if (!current) {
+      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+    }
+
+    const newHash = generateConsentHash(user.id, current.name, level);
+
     const updated = await prisma.dataCategory.update({
       where: { id },
       data: {
         level,
         price: price !== undefined ? parseFloat(price) : undefined,
+        consentHash: newHash
       }
     });
 
     // Log the activity
-    const user = await prisma.user.findFirst();
-    if (user) {
-      await prisma.activityLog.create({
-        data: {
-          userId: user.id,
-          appName: updated.source,
-          action: `Updated permission for ${updated.name} to ${level}`,
-          status: level === 'denied' ? 'blocked' : 'active',
-        }
-      });
-    }
+    await prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        appName: updated.source,
+        action: `Updated permission for ${updated.name} to ${level}. Contract Hash: ${newHash.substring(0, 12)}...`,
+        status: level === 'denied' ? 'blocked' : 'active',
+      }
+    });
 
     return NextResponse.json({ category: updated });
   } catch (error) {

@@ -45,25 +45,7 @@ export async function GET(req: Request) {
     const userData = await userResponse.json();
 
     // Set a simple session cookie
-    const response = new NextResponse(`
-      <html>
-        <body>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', user: ${JSON.stringify(userData)} }, '*');
-              window.close();
-            } else {
-              window.location.href = '/dashboard';
-            }
-          </script>
-          <p>Authentication successful. This window should close automatically.</p>
-        </body>
-      </html>
-    `, {
-      headers: {
-        'Content-Type': 'text/html',
-      },
-    });
+    const response = NextResponse.redirect(new URL('/dashboard', req.url));
 
     // In a real app, you'd sign a JWT. Here we just set a simple cookie for demo purposes.
     response.cookies.set('auth_session', JSON.stringify({ name: userData.name || userData.login, provider: 'github' }), {

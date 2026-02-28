@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Shield, Lock, Unlock, DollarSign, Search, Filter, AlertCircle, Loader2 } from 'lucide-react';
+import { Shield, Lock, Unlock, DollarSign, Search, Filter, AlertCircle, Loader2, Fingerprint } from 'lucide-react';
 import * as motion from 'motion/react-client';
 
 type PermissionLevel = 'denied' | 'restricted' | 'monetized';
@@ -13,6 +13,7 @@ interface DataCategory {
   source: string;
   level: PermissionLevel;
   price?: number;
+  consentHash?: string;
 }
 
 export default function DataPermissions() {
@@ -51,6 +52,10 @@ export default function DataPermissions() {
       });
       
       if (!res.ok) throw new Error('Failed to update');
+      
+      // Refresh to get the new hash
+      const updatedRes = await res.json();
+      setData(data.map(item => item.id === id ? { ...item, ...updatedRes.category } : item));
     } catch (error) {
       console.error('Failed to update permission:', error);
       setData(oldData); // Rollback
@@ -120,6 +125,14 @@ export default function DataPermissions() {
                 <h3 className="text-lg font-semibold text-white">{item.name}</h3>
               </div>
               <p className="text-sm text-zinc-400">{item.description}</p>
+              {item.consentHash && (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <Fingerprint className="w-3 h-3 text-emerald-500/50" />
+                  <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[200px]">
+                    Contract: {item.consentHash}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 bg-zinc-900/50 p-1 rounded-xl border border-white/5">

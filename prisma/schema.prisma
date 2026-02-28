@@ -48,6 +48,7 @@ model Permission {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   appName      String   // 'OpenAI', 'Midjourney', etc.
   status       String   // 'approved', 'denied', 'active', 'blocked'
+  consentHash  String?  // Hash for verification
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -61,6 +62,7 @@ model DataCategory {
   source       String
   level        String   // 'denied', 'restricted', 'monetized'
   price        Float?   @default(0)
+  consentHash  String?  // Hash for verification
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

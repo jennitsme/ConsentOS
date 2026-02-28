@@ -100,21 +100,33 @@ export default function DashboardOverview() {
     }
   };
 
-  const handleDownloadReport = async () => {
+  const handleDownloadReport = async (format: 'json' | 'csv' = 'csv') => {
     setIsDownloading(true);
     try {
-      const res = await fetch('/api/legal-report');
-      const data = await res.json();
+      const res = await fetch(`/api/legal-report?format=${format}`);
       
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `ConsentOS-Legal-Report-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      if (format === 'csv') {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ConsentOS-Audit-Trail-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ConsentOS-Legal-Report-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
     } catch (error) {
       console.error('Failed to download report:', error);
       alert('Failed to generate legal report.');
@@ -180,7 +192,7 @@ export default function DashboardOverview() {
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={handleDownloadReport}
+            onClick={() => handleDownloadReport('csv')}
             disabled={isDownloading}
             className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >

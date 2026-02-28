@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const format = searchParams.get('format') || 'json';
+
     const user = await prisma.user.findFirst();
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -20,6 +23,24 @@ export async function GET() {
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' }
     });
+
+    if (format === 'csv') {
+      let csv = 'Timestamp,App/Source,Action,Status,Consent Hash\n';
+      activity.forEach(a => {
+        // Extract hash from action if present
+        const hashMatch = a.action.match(/Contract Hash: (.*)\.\.\./);
+        const hash = hashMatch ? hashMatch[1] : 'N/A';
+        const cleanAction = a.action.replace(/,/, ';'); // Basic CSV escaping
+        csv += `${a.createdAt.toISOString()},${a.appName},${cleanAction},${a.status},${hash}\n`;
+      });
+
+      return new Response(csv, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="ConsentOS-Audit-Trail-${new Date().toISOString().split('T')[0]}.csv"`
+        }
+      });
+    }
 
     const report = {
       generatedAt: new Date().toISOString(),
@@ -44,7 +65,8 @@ export async function GET() {
         category: p.name,
         level: p.level,
         source: p.source,
-        price: p.price
+        price: p.price,
+        consentHash: p.consentHash
       })),
       activityLogs: activity.map(a => ({
         timestamp: a.createdAt,
@@ -54,7 +76,6 @@ export async function GET() {
       }))
     };
 
-    // Return as JSON for now, frontend can convert to CSV/Text if needed
     return NextResponse.json(report);
   } catch (error) {
     console.error('Error generating legal report:', error);

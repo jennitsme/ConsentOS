@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ShieldCheck, LayoutDashboard, Database, Activity, Wallet, FileText, Settings, LogOut, User, Menu, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import * as motion from 'motion/react-client';
+import { AnimatePresence } from 'motion/react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();

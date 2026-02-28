@@ -15,12 +15,12 @@ export async function GET(request: Request) {
 
   if (error) {
     return new NextResponse(`
-      <html><body><script>
+      <script>
         if (window.opener) {
           window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: '${error}' }, '*');
           window.close();
         }
-      </script></body></html>
+      </script>
     `, { headers: { 'Content-Type': 'text/html' } });
   }
 
@@ -110,30 +110,26 @@ export async function GET(request: Request) {
 
     // Send success message to parent window and close popup
     return new NextResponse(`
-      <html>
-        <body>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', provider: 'Google Workspace' }, '*');
-              window.close();
-            } else {
-              window.location.href = '/dashboard';
-            }
-          </script>
-          <p>Authentication successful. This window should close automatically.</p>
-        </body>
-      </html>
+      <script>
+        if (window.opener) {
+          window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', provider: 'Google Workspace' }, '*');
+          window.close();
+        } else {
+          window.location.href = '/dashboard';
+        }
+      </script>
+      <p>Authentication successful. This window should close automatically.</p>
     `, { headers: { 'Content-Type': 'text/html' } });
 
   } catch (err: any) {
     console.error('OAuth callback error:', err);
     return new NextResponse(`
-      <html><body><script>
+      <script>
         if (window.opener) {
           window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: '${err.message}' }, '*');
           window.close();
         }
-      </script></body></html>
+      </script>
     `, { headers: { 'Content-Type': 'text/html' } });
   }
 }
