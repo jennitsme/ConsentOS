@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String?       @unique
+  name          String?
+  avatarUrl     String?
+  provider      String        // 'github', 'email', 'wallet'
+  providerId    String?       @unique // e.g., github id, wallet address
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  connections   Connection[]
+  permissions   Permission[]
+  activityLogs  ActivityLog[]
+}
+
+model Connection {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     String   // 'google', 'twitter', 'dropbox', 'meta'
+  status       String   // 'connected', 'action_required', 'disconnected'
+  type         String   // 'Email & Docs', 'Social Posts', etc.
+  lastSync     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, provider])
+}
+
+model Permission {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appName      String   // 'OpenAI', 'Midjourney', etc.
+  status       String   // 'approved', 'denied', 'active', 'blocked'
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ActivityLog {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appName      String
+  action       String   // 'Requested access to public tweets'
+  status       String   // 'approved', 'denied', 'active', 'blocked'
+  createdAt    DateTime @default(now())
+}
