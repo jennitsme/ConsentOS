@@ -59,6 +59,45 @@ export async function POST(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const { provider } = body;
+
+    if (!provider) {
+      return NextResponse.json({ error: 'Provider is required' }, { status: 400 });
+    }
+
+    const user = await prisma.user.findFirst();
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    await prisma.connection.delete({
+      where: {
+        userId_provider: {
+          userId: user.id,
+          provider: provider,
+        }
+      }
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        appName: provider,
+        action: `Disconnected ${provider} account`,
+        status: 'blocked',
+      }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting connection:', error);
+    return NextResponse.json({ error: 'Failed to delete connection' }, { status: 500 });
+  }
+}
+
 export async function GET() {
   try {
     const user = await prisma.user.findFirst();

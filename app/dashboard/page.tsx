@@ -100,6 +100,24 @@ export default function DashboardOverview() {
     }
   };
 
+  const handleDisconnectSource = async (provider: string) => {
+    try {
+      await fetch('/api/connections', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider
+        }),
+      });
+      // Refresh data after disconnecting
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to disconnect source:', error);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -238,6 +256,7 @@ export default function DashboardOverview() {
           <ConnectDataModal 
             onClose={() => setIsConnectModalOpen(false)} 
             onConnect={handleConnectSource}
+            onDisconnect={handleDisconnectSource}
             existingConnections={connections.map(c => c.provider)}
           />
         )}
@@ -246,7 +265,7 @@ export default function DashboardOverview() {
   );
 }
 
-function ConnectDataModal({ onClose, onConnect, existingConnections }: { onClose: () => void, onConnect: (name: string, type: string) => Promise<void>, existingConnections: string[] }) {
+function ConnectDataModal({ onClose, onConnect, onDisconnect, existingConnections }: { onClose: () => void, onConnect: (name: string, type: string) => Promise<void>, onDisconnect: (name: string) => Promise<void>, existingConnections: string[] }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <motion.div
@@ -267,24 +286,32 @@ function ConnectDataModal({ onClose, onConnect, existingConnections }: { onClose
         </div>
         
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          <SourceOption name="Google Workspace" type="Email, Docs, Drive" connected={existingConnections.includes("Google Workspace")} onConnect={onConnect} />
-          <SourceOption name="Twitter / X" type="Social Posts, Interactions" connected={existingConnections.includes("Twitter / X")} onConnect={onConnect} />
-          <SourceOption name="Dropbox" type="Files, Photos" connected={existingConnections.includes("Dropbox")} onConnect={onConnect} />
-          <SourceOption name="Meta" type="Facebook, Instagram, Ads" connected={existingConnections.includes("Meta")} onConnect={onConnect} />
-          <SourceOption name="GitHub" type="Code Repositories, Issues" connected={existingConnections.includes("GitHub")} onConnect={onConnect} />
-          <SourceOption name="LinkedIn" type="Profile, Posts, Connections" connected={existingConnections.includes("LinkedIn")} onConnect={onConnect} />
-          <SourceOption name="Spotify" type="Listening History, Playlists" connected={existingConnections.includes("Spotify")} onConnect={onConnect} />
+          <SourceOption name="Google Workspace" type="Email, Docs, Drive" connected={existingConnections.includes("Google Workspace")} onConnect={onConnect} onDisconnect={onDisconnect} />
+          <SourceOption name="Twitter / X" type="Social Posts, Interactions" connected={existingConnections.includes("Twitter / X")} onConnect={onConnect} onDisconnect={onDisconnect} />
+          <SourceOption name="Dropbox" type="Files, Photos" connected={existingConnections.includes("Dropbox")} onConnect={onConnect} onDisconnect={onDisconnect} />
+          <SourceOption name="Meta" type="Facebook, Instagram, Ads" connected={existingConnections.includes("Meta")} onConnect={onConnect} onDisconnect={onDisconnect} />
+          <SourceOption name="GitHub" type="Code Repositories, Issues" connected={existingConnections.includes("GitHub")} onConnect={onConnect} onDisconnect={onDisconnect} />
+          <SourceOption name="LinkedIn" type="Profile, Posts, Connections" connected={existingConnections.includes("LinkedIn")} onConnect={onConnect} onDisconnect={onDisconnect} />
+          <SourceOption name="Spotify" type="Listening History, Playlists" connected={existingConnections.includes("Spotify")} onConnect={onConnect} onDisconnect={onDisconnect} />
         </div>
       </motion.div>
     </div>
   );
 }
 
-function SourceOption({ name, type, connected, onConnect }: { name: string, type: string, connected: boolean, onConnect: (name: string, type: string) => Promise<void> }) {
+function SourceOption({ name, type, connected, onConnect, onDisconnect }: { name: string, type: string, connected: boolean, onConnect: (name: string, type: string) => Promise<void>, onDisconnect: (name: string) => Promise<void> }) {
   const [isConnecting, setIsConnecting] = useState(false);
 
   const handleConnect = async () => {
-    if (connected) return;
+    if (connected) {
+      setIsConnecting(true);
+      try {
+        await onDisconnect(name);
+      } finally {
+        setIsConnecting(false);
+      }
+      return;
+    }
     setIsConnecting(true);
     try {
       if (name === 'Google Workspace') {
@@ -340,17 +367,17 @@ function SourceOption({ name, type, connected, onConnect }: { name: string, type
       </div>
       <button 
         onClick={handleConnect}
-        disabled={connected || isConnecting}
+        disabled={isConnecting}
         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
           connected 
-            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+            ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20' 
             : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
         }`}
       >
         {isConnecting ? (
-          <><Activity className="w-4 h-4 animate-spin" /> Connecting...</>
+          <><Activity className="w-4 h-4 animate-spin" /> {connected ? 'Disconnecting...' : 'Connecting...'}</>
         ) : connected ? (
-          <><CheckCircle2 className="w-4 h-4" /> Connected</>
+          <><X className="w-4 h-4" /> Disconnect</>
         ) : (
           <><Plus className="w-4 h-4" /> Connect</>
         )}

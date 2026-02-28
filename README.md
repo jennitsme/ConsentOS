@@ -31,7 +31,7 @@ Take back control of your data, track your active permissions, and seamlessly in
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/jennitsme/consentos.git
+   git clone https://github.com/yourusername/consentos.git
    cd consentos
    ```
 

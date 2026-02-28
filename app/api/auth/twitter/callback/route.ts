@@ -3,11 +3,13 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams, origin, pathname } = new URL(request.url);
   const code = searchParams.get('code');
   const error = searchParams.get('error');
   
-  const redirectUri = `${origin}/api/auth/twitter/callback`;
+  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+  const redirectUri = `${protocol}://${host}${pathname}`;
 
   if (error) {
     return new NextResponse(`

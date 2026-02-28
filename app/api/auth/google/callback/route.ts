@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams, origin, pathname } = new URL(request.url);
   const code = searchParams.get('code');
   const error = searchParams.get('error');
   
   // The redirect_uri must match exactly what was sent in the /url endpoint
-  const redirectUri = `${origin}/api/auth/google/callback`;
+  // When running behind a proxy (like in AI Studio), the origin might be different
+  // We should reconstruct the exact URL that was used as the callback
+  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+  const redirectUri = `${protocol}://${host}${pathname}`;
 
   if (error) {
     return new NextResponse(`
