@@ -22,17 +22,15 @@ export async function GET() {
       }
     });
 
-    // Data points bisa berupa jumlah log aktivitas dikali multiplier
     const activityCount = await prisma.activityLog.count({
       where: { userId: user.id }
     });
     
-    // Jika masih kosong, kita berikan nilai default agar UI tidak terlihat kosong
-    const dataPoints = activityCount > 0 ? activityCount * 150 : 12450;
-    const finalActivePermissions = activePermissions > 0 ? activePermissions : 12;
+    // Calculate data points based on activity (real data logic)
+    const dataPoints = activityCount * 150;
 
     return NextResponse.json({
-      activePermissions: finalActivePermissions,
+      activePermissions: activePermissions,
       dataPoints: dataPoints
     });
   } catch (error) {
