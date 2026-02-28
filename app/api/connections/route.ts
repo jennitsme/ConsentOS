@@ -21,6 +21,22 @@ export async function POST(request: Request) {
       });
     }
 
+    // Helper to get default privacy scores and data counts
+    const getProviderDefaults = (provider: string) => {
+      const defaults: Record<string, { score: number, count: number }> = {
+        'Google Workspace': { score: 85, count: 1240 },
+        'Twitter / X': { score: 62, count: 432 },
+        'Dropbox': { score: 78, count: 850 },
+        'Meta': { score: 45, count: 2100 },
+        'GitHub': { score: 92, count: 156 },
+        'LinkedIn': { score: 70, count: 320 },
+        'Spotify': { score: 80, count: 540 },
+      };
+      return defaults[provider] || { score: 50, count: 100 };
+    };
+
+    const { score, count } = getProviderDefaults(provider);
+
     // Upsert connection: update jika sudah ada, create jika belum
     const connection = await prisma.connection.upsert({
       where: {
@@ -32,6 +48,8 @@ export async function POST(request: Request) {
       update: {
         status: status,
         type: type || 'General',
+        privacyScore: score,
+        dataCount: count,
         lastSync: new Date(),
       },
       create: {
@@ -39,6 +57,8 @@ export async function POST(request: Request) {
         provider: provider,
         status: status,
         type: type || 'General',
+        privacyScore: score,
+        dataCount: count,
       }
     });
 

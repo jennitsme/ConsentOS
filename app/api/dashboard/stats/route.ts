@@ -25,13 +25,23 @@ export async function GET() {
     const activityCount = await prisma.activityLog.count({
       where: { userId: user.id }
     });
+
+    const connections = await prisma.connection.findMany({
+      where: { userId: user.id }
+    });
+
+    const totalDataPoints = connections.reduce((acc, conn) => acc + conn.dataCount, 0);
+    const avgPrivacyScore = connections.length > 0 
+      ? Math.round(connections.reduce((acc, conn) => acc + conn.privacyScore, 0) / connections.length)
+      : 0;
     
-    // Calculate data points based on activity (real data logic)
-    const dataPoints = activityCount * 150;
+    // Fallback to activity-based calculation if no connections
+    const dataPoints = totalDataPoints || (activityCount * 150);
 
     return NextResponse.json({
       activePermissions: activePermissions,
-      dataPoints: dataPoints
+      dataPoints: dataPoints,
+      privacyScore: avgPrivacyScore
     });
   } catch (error) {
     console.error('Error fetching stats:', error);

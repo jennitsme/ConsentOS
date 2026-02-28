@@ -5,13 +5,15 @@ import {
   ArrowRight, ShieldCheck, Database, Lock, Zap, Activity, 
   ChevronRight, Globe, Cpu, FileText,
   Twitter, Github, Linkedin, Terminal, Code, Fingerprint,
-  CheckCircle2
+  CheckCircle2, Menu, X
 } from 'lucide-react';
 import * as motion from 'motion/react-client';
+import { AnimatePresence } from 'motion/react';
 import { useEffect, useState } from 'react';
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -48,14 +50,45 @@ export default function Home() {
             <Link href="/login" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors hidden sm:block">
               Log in
             </Link>
-            <Link href="/dashboard" className="relative group text-sm font-medium bg-emerald-500 text-zinc-950 px-5 py-2 rounded-full transition-all overflow-hidden">
+            <Link href="/dashboard" className="relative group text-sm font-medium bg-emerald-500 text-zinc-950 px-5 py-2 rounded-full transition-all overflow-hidden hidden sm:flex">
               <span className="relative z-10 flex items-center gap-2">
                 Open App <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </span>
               <div className="absolute inset-0 bg-emerald-400 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
             </Link>
+            <button 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="md:hidden p-2 text-zinc-400 hover:text-white"
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden border-t border-white/5 bg-zinc-950 overflow-hidden"
+            >
+              <div className="flex flex-col p-6 gap-4 text-zinc-400 font-medium">
+                <Link href="#features" onClick={() => setIsMenuOpen(false)} className="hover:text-emerald-400 transition-colors">Features</Link>
+                <Link href="#how-it-works" onClick={() => setIsMenuOpen(false)} className="hover:text-emerald-400 transition-colors">How it Works</Link>
+                <Link href="#about" onClick={() => setIsMenuOpen(false)} className="hover:text-emerald-400 transition-colors">About</Link>
+                <Link href="#faq" onClick={() => setIsMenuOpen(false)} className="hover:text-emerald-400 transition-colors">FAQ</Link>
+                <div className="pt-4 flex flex-col gap-4 border-t border-white/5">
+                  <Link href="/login" onClick={() => setIsMenuOpen(false)} className="text-white">Log in</Link>
+                  <Link href="/dashboard" onClick={() => setIsMenuOpen(false)} className="bg-emerald-500 text-zinc-950 px-5 py-3 rounded-xl text-center font-bold">
+                    Open App
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.nav>
 
       {/* Hero Section */}

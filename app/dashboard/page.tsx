@@ -11,9 +11,11 @@ export default function DashboardOverview() {
   
   const [activePermissions, setActivePermissions] = useState(0);
   const [dataPoints, setDataPoints] = useState(0);
+  const [privacyScore, setPrivacyScore] = useState(0);
   const [recentRequests, setRecentRequests] = useState<any[]>([]);
   const [connections, setConnections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -29,6 +31,7 @@ export default function DashboardOverview() {
 
       setActivePermissions(statsData.activePermissions || 0);
       setDataPoints(statsData.dataPoints || 0);
+      setPrivacyScore(statsData.privacyScore || 0);
       
       if (activityData.activity) {
         setRecentRequests(activityData.activity.map((item: any) => ({
@@ -97,6 +100,29 @@ export default function DashboardOverview() {
     }
   };
 
+  const handleDownloadReport = async () => {
+    setIsDownloading(true);
+    try {
+      const res = await fetch('/api/legal-report');
+      const data = await res.json();
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ConsentOS-Legal-Report-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Failed to download report:', error);
+      alert('Failed to generate legal report.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleConnectSource = async (provider: string, type: string) => {
     try {
       await fetch('/api/connections', {
@@ -154,6 +180,14 @@ export default function DashboardOverview() {
         </div>
         <div className="flex items-center gap-3">
           <button 
+            onClick={handleDownloadReport}
+            disabled={isDownloading}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
+            {isDownloading ? 'Generating...' : 'Legal Report'}
+          </button>
+          <button 
             onClick={handleRevokeAll}
             disabled={isRevoking}
             className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
@@ -181,9 +215,9 @@ export default function DashboardOverview() {
           color="emerald"
         />
         <StatCard 
-          title="Restricted Access" 
-          value="12" 
-          trend="Stable" 
+          title="Privacy Score" 
+          value={`${privacyScore}/100`} 
+          trend={privacyScore > 70 ? "Healthy" : "Action Needed"} 
           icon={<ShieldAlert className="w-5 h-5 text-amber-400" />} 
           color="amber"
         />
@@ -216,6 +250,8 @@ export default function DashboardOverview() {
                   type={conn.type} 
                   lastSync={new Date(conn.lastSync).toLocaleDateString()} 
                   warning={conn.status !== 'connected'} 
+                  privacyScore={conn.privacyScore}
+                  dataCount={conn.dataCount}
                 />
               ))
             ) : (
@@ -426,10 +462,12 @@ function StatCard({ title, value, trend, icon, color }: { title: string, value: 
   );
 }
 
-function ConnectionCard({ name, status, type, lastSync, warning = false }: { name: string, status: string, type: string, lastSync: string, warning?: boolean }) {
+function ConnectionCard({ name, status, type, lastSync, privacyScore, dataCount, warning = false }: { name: string, status: string, type: string, lastSync: string, privacyScore: number, dataCount: number, warning?: boolean }) {
   return (
-    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 hover:border-emerald-500/30 transition-colors group cursor-pointer">
-      <div className="flex items-start justify-between mb-3">
+    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 hover:border-emerald-500/30 transition-colors group cursor-pointer relative overflow-hidden">
+      <div className={`absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-[40px] rounded-full pointer-events-none`} />
+      
+      <div className="flex items-start justify-between mb-3 relative z-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center">
             <LinkIcon className="w-4 h-4 text-zinc-400" />
@@ -439,15 +477,31 @@ function ConnectionCard({ name, status, type, lastSync, warning = false }: { nam
             <p className="text-xs text-zinc-500">{type}</p>
           </div>
         </div>
-        {warning ? (
-          <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-        ) : (
-          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-        )}
+        <div className="flex flex-col items-end">
+          {warning ? (
+            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          )}
+          <span className={`text-[10px] font-bold mt-2 ${privacyScore > 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
+            Score: {privacyScore}
+          </span>
+        </div>
       </div>
-      <div className="flex items-center justify-between mt-4 text-xs">
-        <span className={warning ? "text-amber-400" : "text-emerald-400"}>{status}</span>
-        <span className="text-zinc-500">Synced {lastSync}</span>
+
+      <div className="mt-4 grid grid-cols-2 gap-4 border-t border-white/5 pt-4 relative z-10">
+        <div>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Data Points</p>
+          <p className="text-sm font-semibold text-white">{dataCount.toLocaleString()}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Status</p>
+          <p className={`text-sm font-semibold ${warning ? 'text-amber-400' : 'text-emerald-400'}`}>{status}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 text-[10px] text-zinc-500 flex justify-between relative z-10">
+        <span>Last synced {lastSync}</span>
       </div>
     </div>
   );
