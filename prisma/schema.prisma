@@ -50,6 +50,7 @@ model Permission {
   appName      String   // 'OpenAI', 'Midjourney', etc.
   status       String   // 'approved', 'denied', 'active', 'blocked'
   consentHash  String?  // Hash for verification
+  solanaSignature String? // Solana transaction signature
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -64,6 +65,7 @@ model DataCategory {
   level        String   // 'denied', 'restricted', 'monetized'
   price        Float?   @default(0)
   consentHash  String?  // Hash for verification
+  solanaSignature String? // Solana transaction signature
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -77,6 +79,7 @@ model ActivityLog {
   appName      String
   action       String   // 'Requested access to public tweets'
   status       String   // 'approved', 'denied', 'active', 'blocked'
+  solanaSignature String? // Solana transaction signature
   createdAt    DateTime @default(now())
 }
 

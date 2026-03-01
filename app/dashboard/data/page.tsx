@@ -14,6 +14,7 @@ interface DataCategory {
   level: PermissionLevel;
   price?: number;
   consentHash?: string;
+  solanaSignature?: string;
 }
 
 export default function DataPermissions() {
@@ -126,11 +127,24 @@ export default function DataPermissions() {
               </div>
               <p className="text-sm text-zinc-400">{item.description}</p>
               {item.consentHash && (
-                <div className="mt-2 flex items-center gap-1.5">
-                  <Fingerprint className="w-3 h-3 text-emerald-500/50" />
-                  <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[200px]">
-                    Contract: {item.consentHash}
-                  </span>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <Fingerprint className="w-3 h-3 text-emerald-500/50" />
+                    <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[150px]">
+                      Contract: {item.consentHash}
+                    </span>
+                  </div>
+                  {item.solanaSignature && (
+                    <a 
+                      href={`https://explorer.solana.com/tx/${item.solanaSignature}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      View on Solana
+                    </a>
+                  )}
                 </div>
               )}
             </div>

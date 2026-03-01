@@ -39,7 +39,8 @@ export default function DashboardOverview() {
           app: item.appName,
           action: item.action,
           time: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          status: item.status
+          status: item.status,
+          solanaSignature: item.solanaSignature
         })));
       }
 
@@ -306,6 +307,7 @@ export default function DashboardOverview() {
                     action={req.action} 
                     time={req.time} 
                     status={req.status}
+                    solanaSignature={req.solanaSignature}
                   />
                 </motion.div>
               ))
@@ -533,7 +535,7 @@ function ConnectionCard({ name, status, type, lastSync, privacyScore, dataCount,
   );
 }
 
-function ActivityItem({ app, action, time, status }: { app: string, action: string, time: string, status: 'approved' | 'denied' | 'active' | 'blocked' }) {
+function ActivityItem({ app, action, time, status, solanaSignature }: { app: string, action: string, time: string, status: 'approved' | 'denied' | 'active' | 'blocked', solanaSignature?: string }) {
   const statusColors = {
     approved: 'text-emerald-400 bg-emerald-400/10 border-emerald-500/20',
     denied: 'text-red-400 bg-red-400/10 border-red-500/20',
@@ -550,10 +552,20 @@ function ActivityItem({ app, action, time, status }: { app: string, action: stri
           <span className="text-xs font-mono text-zinc-500">{time}</span>
         </div>
         <p className="text-xs text-zinc-400 mt-1">{action}</p>
-        <div className="mt-2 inline-flex">
+        <div className="mt-2 flex items-center justify-between">
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${statusColors[status]}`}>
             {status}
           </span>
+          {solanaSignature && (
+            <a 
+              href={`https://explorer.solana.com/tx/${solanaSignature}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1"
+            >
+              On-Chain Proof
+            </a>
+          )}
         </div>
       </div>
     </div>

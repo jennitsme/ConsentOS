@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateConsentHash } from '@/lib/hashing';
+import { solanaService } from '@/lib/solana';
 
 const INITIAL_CATEGORIES = [
   { name: 'Public Tweets', description: 'All public text posts on Twitter/X', source: 'Twitter', level: 'monetized', price: 0.5 },
@@ -29,15 +30,21 @@ export async function GET() {
 
     // Initialize if empty
     if (categories.length === 0) {
-      await Promise.all(INITIAL_CATEGORIES.map(cat => 
-        prisma.dataCategory.create({
+      await Promise.all(INITIAL_CATEGORIES.map(async (cat) => {
+        const consentHash = generateConsentHash(user.id!, cat.name, cat.level);
+        
+        // Record on Solana (async, don't block initialization)
+        const solanaSignature = await solanaService.recordConsentOnChain(user.id!, cat.name, consentHash);
+
+        return prisma.dataCategory.create({
           data: {
             ...cat,
             userId: user.id!,
-            consentHash: generateConsentHash(user.id!, cat.name, cat.level)
+            consentHash,
+            solanaSignature
           }
-        })
-      ));
+        });
+      }));
       categories = await prisma.dataCategory.findMany({
         where: { userId: user.id }
       });
@@ -66,12 +73,17 @@ export async function PATCH(request: Request) {
 
     const newHash = generateConsentHash(user.id, current.name, level);
 
+    // Record on Solana
+    // In a real app, we might want to wait for this or handle it as a background job
+    const solanaSignature = await solanaService.recordConsentOnChain(user.id, current.name, newHash);
+
     const updated = await prisma.dataCategory.update({
       where: { id },
       data: {
         level,
         price: price !== undefined ? parseFloat(price) : undefined,
-        consentHash: newHash
+        consentHash: newHash,
+        solanaSignature
       }
     });
 
@@ -82,6 +94,7 @@ export async function PATCH(request: Request) {
         appName: updated.source,
         action: `Updated permission for ${updated.name} to ${level}. Contract Hash: ${newHash.substring(0, 12)}...`,
         status: level === 'denied' ? 'blocked' : 'active',
+        solanaSignature
       }
     });
 
