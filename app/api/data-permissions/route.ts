@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateConsentHash } from '@/lib/hashing';
 import { solanaService } from '@/lib/solana';
+import { getCurrentUser } from '@/lib/auth';
 
 const INITIAL_CATEGORIES = [
   { name: 'Public Tweets', description: 'All public text posts on Twitter/X', source: 'Twitter', level: 'monetized', price: 0.5 },
@@ -13,15 +14,19 @@ const INITIAL_CATEGORIES = [
 
 export async function GET() {
   try {
-    let user = await prisma.user.findFirst();
+    let user = await getCurrentUser();
     if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: 'user@example.com',
-          name: 'Default User',
-          provider: 'email',
-        }
-      });
+      // For development, if no session, fallback to first user or create one
+      user = await prisma.user.findFirst();
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email: 'user@example.com',
+            name: 'Default User',
+            provider: 'email',
+          }
+        });
+      }
     }
 
     let categories = await prisma.dataCategory.findMany({
@@ -31,15 +36,16 @@ export async function GET() {
     // Initialize if empty
     if (categories.length === 0) {
       await Promise.all(INITIAL_CATEGORIES.map(async (cat) => {
-        const consentHash = generateConsentHash(user.id!, cat.name, cat.level);
+        const userId = user!.id;
+        const consentHash = generateConsentHash(userId, cat.name, cat.level);
         
         // Record on Solana (async, don't block initialization)
-        const solanaSignature = await solanaService.recordConsentOnChain(user.id!, cat.name, consentHash);
+        const solanaSignature = await solanaService.recordConsentOnChain(userId, cat.name, consentHash);
 
         return prisma.dataCategory.create({
           data: {
             ...cat,
-            userId: user.id!,
+            userId: userId,
             consentHash,
             solanaSignature
           }
@@ -60,10 +66,13 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const { id, level, price } = await request.json();
-    const user = await prisma.user.findFirst();
+    let user = await getCurrentUser();
     
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      user = await prisma.user.findFirst();
+      if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
     }
 
     const current = await prisma.dataCategory.findUnique({ where: { id } });
@@ -74,7 +83,6 @@ export async function PATCH(request: Request) {
     const newHash = generateConsentHash(user.id, current.name, level);
 
     // Record on Solana
-    // In a real app, we might want to wait for this or handle it as a background job
     const solanaSignature = await solanaService.recordConsentOnChain(user.id, current.name, newHash);
 
     const updated = await prisma.dataCategory.update({

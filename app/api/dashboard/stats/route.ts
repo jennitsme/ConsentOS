@@ -1,18 +1,21 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function GET() {
   try {
-    // Menggunakan user pertama sebagai dummy user sementara
-    let user = await prisma.user.findFirst();
+    let user = await getCurrentUser();
     if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: 'dummy@example.com',
-          name: 'Dummy User',
-          provider: 'email',
-        }
-      });
+      user = await prisma.user.findFirst();
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email: 'dummy@example.com',
+            name: 'Dummy User',
+            provider: 'email',
+          }
+        });
+      }
     }
 
     const activePermissions = await prisma.permission.count({
@@ -41,7 +44,7 @@ export async function GET() {
     return NextResponse.json({
       activePermissions: activePermissions,
       dataPoints: dataPoints,
-      privacyScore: avgPrivacyScore
+      privacyScore: avgPrivacyScore || 85 // Default score if no connections
     });
   } catch (error) {
     console.error('Error fetching stats:', error);

@@ -1,18 +1,22 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { solanaService } from '@/lib/solana';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function GET() {
   try {
-    let user = await prisma.user.findFirst();
+    let user = await getCurrentUser();
     if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: 'user@example.com',
-          name: 'Default User',
-          provider: 'email',
-        }
-      });
+      user = await prisma.user.findFirst();
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email: 'user@example.com',
+            name: 'Default User',
+            provider: 'email',
+          }
+        });
+      }
     }
 
     // Initialize with some dummy transactions if none exist
@@ -73,8 +77,11 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { amount, source } = await request.json();
-    const user = await prisma.user.findFirst();
-    if (!user) throw new Error('User not found');
+    let user = await getCurrentUser();
+    if (!user) {
+      user = await prisma.user.findFirst();
+      if (!user) throw new Error('User not found');
+    }
 
     const transaction = await prisma.transaction.create({
       data: {

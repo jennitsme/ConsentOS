@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { solanaService } from '@/lib/solana';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function POST() {
   try {
-    const user = await prisma.user.findFirst();
+    let user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      user = await prisma.user.findFirst();
+      if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
     }
 
     // 1. Delete all connections

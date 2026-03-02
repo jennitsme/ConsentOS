@@ -133,6 +133,7 @@ export async function GET(req: Request) {
     // Set auth session cookie
     const cookieStore = await cookies();
     cookieStore.set('auth_session', JSON.stringify({ 
+      id: user.id,
       name: userData.name || userData.login, 
       provider: 'github' 
     }), {
