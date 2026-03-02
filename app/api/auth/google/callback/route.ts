@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { solanaService } from '@/lib/solana';
 
 export async function GET(request: Request) {
   const { searchParams, origin, pathname } = new URL(request.url);
@@ -125,12 +126,16 @@ export async function GET(request: Request) {
       }
     });
 
+    // Record on Solana
+    const solanaSignature = await solanaService.recordConsentOnChain(user.id, 'Google Workspace', 'connected');
+
     await prisma.activityLog.create({
       data: {
         userId: user.id,
         appName: 'Google Workspace',
         action: `Connected Google account (${userInfo.email})`,
         status: 'approved',
+        solanaSignature
       }
     });
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { solanaService } from '@/lib/solana';
 
 export async function POST(request: Request) {
   try {
@@ -62,6 +63,9 @@ export async function POST(request: Request) {
       }
     });
 
+    // Record on Solana
+    const solanaSignature = await solanaService.recordConsentOnChain(user.id, provider, status);
+
     // Tambahkan log aktivitas bahwa user menyambungkan akun
     await prisma.activityLog.create({
       data: {
@@ -69,6 +73,7 @@ export async function POST(request: Request) {
         appName: provider,
         action: `Connected ${provider} account`,
         status: status === 'connected' ? 'approved' : 'active',
+        solanaSignature
       }
     });
 
@@ -102,12 +107,16 @@ export async function DELETE(request: Request) {
       }
     });
 
+    // Record on Solana
+    const solanaSignature = await solanaService.recordConsentOnChain(user.id, provider, 'disconnected');
+
     await prisma.activityLog.create({
       data: {
         userId: user.id,
         appName: provider,
         action: `Disconnected ${provider} account`,
         status: 'blocked',
+        solanaSignature
       }
     });
 

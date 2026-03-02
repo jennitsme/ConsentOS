@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { solanaService } from '@/lib/solana';
 
 export async function POST() {
   try {

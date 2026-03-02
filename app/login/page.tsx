@@ -11,14 +11,17 @@ export default function Login() {
   const [email, setEmail] = useState('');
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = async (event: MessageEvent) => {
       // Validate origin is from AI Studio preview or localhost
       const origin = event.origin;
       if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
         return;
       }
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+        // Force a small delay to ensure cookie is set
+        await new Promise(resolve => setTimeout(resolve, 500));
         router.push('/dashboard');
+        router.refresh(); // Force a refresh to ensure layout gets new session
       }
     };
     window.addEventListener('message', handleMessage);

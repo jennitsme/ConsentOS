@@ -38,7 +38,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      setUser(null); // Clear user state immediately
       router.push('/');
+      router.refresh(); // Force a refresh to clear any cached layout state
     } catch (error) {
       console.error('Logout failed', error);
     }

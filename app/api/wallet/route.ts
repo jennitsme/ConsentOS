@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { solanaService } from '@/lib/solana';
 
 export async function GET() {
   try {
@@ -85,12 +86,16 @@ export async function POST(request: Request) {
       }
     });
 
+    // Record on Solana
+    const solanaSignature = await solanaService.recordConsentOnChain(user.id, 'Wallet', 'withdrawal');
+
     await prisma.activityLog.create({
       data: {
         userId: user.id,
         appName: 'Wallet',
         action: `Withdrew $${Math.abs(amount).toFixed(2)} to ${source}`,
-        status: 'active'
+        status: 'active',
+        solanaSignature
       }
     });
 

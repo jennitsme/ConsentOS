@@ -1,18 +1,49 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Activity, Clock, Search, Filter, ArrowUpRight, ShieldAlert, ShieldCheck, Download } from 'lucide-react';
 import * as motion from 'motion/react-client';
 
-const activities = [
-  { id: 1, app: 'OpenAI (GPT-4)', action: 'Requested access to public tweets for model training', time: '10 mins ago', status: 'approved', hash: '0x8f...3d2a' },
-  { id: 2, app: 'Midjourney', action: 'Requested access to Instagram photos', time: '2 hours ago', status: 'denied', hash: '0x1a...9b4c' },
-  { id: 3, app: 'Grammarly', action: 'Accessed Google Docs for grammar checking', time: '5 hours ago', status: 'active', hash: '0x4c...2e1f' },
-  { id: 4, app: 'Unknown AI Scraper', action: 'Attempted to scrape LinkedIn profile', time: '1 day ago', status: 'blocked', hash: '0x9d...7a5b' },
-  { id: 5, app: 'Anthropic Claude', action: 'Requested access to Medium blog posts', time: '2 days ago', status: 'monetized', hash: '0x2b...8c4d', earnings: '+$1.20' },
-  { id: 6, app: 'Runway ML', action: 'Requested access to YouTube videos', time: '3 days ago', status: 'denied', hash: '0x5e...1f3a' },
-];
+interface ActivityLog {
+  id: string;
+  appName: string;
+  action: string;
+  status: string;
+  solanaSignature?: string;
+  createdAt: string;
+}
 
 export default function ActivityLog() {
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchActivities() {
+      try {
+        const response = await fetch('/api/activity');
+        if (response.ok) {
+          const data = await response.json();
+          setActivities(data.activity || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch activities:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchActivities();
+  }, []);
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) return `${diffInSeconds} secs ago`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} mins ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  };
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -44,7 +75,11 @@ export default function ActivityLog() {
         </div>
 
         <div className="relative border-l border-white/10 ml-3 space-y-8 pb-4">
-          {activities.map((item, index) => (
+          {loading ? (
+            <div className="text-zinc-400 text-sm pl-8">Loading activities...</div>
+          ) : activities.length === 0 ? (
+            <div className="text-zinc-400 text-sm pl-8">No activities found.</div>
+          ) : activities.map((item, index) => (
             <motion.div 
               key={item.id}
               initial={{ opacity: 0, x: -10 }}
@@ -57,19 +92,14 @@ export default function ActivityLog() {
               <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-4 hover:border-white/10 transition-colors group">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-semibold text-white">{item.app}</h3>
+                    <h3 className="text-base font-semibold text-white">{item.appName}</h3>
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wider ${getStatusBadge(item.status)}`}>
                       {item.status}
                     </span>
-                    {item.earnings && (
-                      <span className="text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                        {item.earnings}
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-zinc-500">
                     <Clock className="w-3 h-3" />
-                    {item.time}
+                    {formatTime(item.createdAt)}
                   </div>
                 </div>
                 
@@ -77,12 +107,28 @@ export default function ActivityLog() {
                 
                 <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
                   <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono">
-                    <ShieldCheck className="w-3 h-3 text-emerald-500/50" />
-                    Contract Hash: {item.hash}
+                    {item.solanaSignature ? (
+                      <>
+                        <ShieldCheck className="w-3 h-3 text-emerald-500/50" />
+                        Contract Hash: {item.solanaSignature.substring(0, 12)}...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldAlert className="w-3 h-3 text-amber-500/50" />
+                        No on-chain record
+                      </>
+                    )}
                   </div>
-                  <button className="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    View on Explorer <ArrowUpRight className="w-3 h-3" />
-                  </button>
+                  {item.solanaSignature && (
+                    <a 
+                      href={`https://explorer.solana.com/tx/${item.solanaSignature}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      View on Explorer <ArrowUpRight className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               </div>
             </motion.div>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
+import { solanaService } from '@/lib/solana';
 
 export async function GET(request: Request) {
   const { searchParams, origin, pathname } = new URL(request.url);
@@ -115,12 +116,16 @@ export async function GET(request: Request) {
       }
     });
 
+    // Record on Solana
+    const solanaSignature = await solanaService.recordConsentOnChain(user.id, 'Twitter / X', 'connected');
+
     await prisma.activityLog.create({
       data: {
         userId: user.id,
         appName: 'Twitter / X',
         action: `Connected Twitter account (@${userInfo.username})`,
         status: 'approved',
+        solanaSignature
       }
     });
 

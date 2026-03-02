@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
+import { solanaService } from '@/lib/solana';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -94,13 +96,51 @@ export async function GET(req: Request) {
       }
     });
 
+    // Record on Solana
+    const solanaSignature = await solanaService.recordConsentOnChain(user.id, 'GitHub', 'connected');
+
+    // Create a Permission (Contract) for this connection
+    const existingPermission = await prisma.permission.findFirst({
+      where: { userId: user.id, appName: 'GitHub' }
+    });
+
+    if (existingPermission) {
+      await prisma.permission.update({
+        where: { id: existingPermission.id },
+        data: { status: 'active', solanaSignature }
+      });
+    } else {
+      await prisma.permission.create({
+        data: {
+          userId: user.id,
+          appName: 'GitHub',
+          status: 'active',
+          solanaSignature
+        }
+      });
+    }
+
     await prisma.activityLog.create({
       data: {
         userId: user.id,
         appName: 'GitHub',
         action: `Connected GitHub account (@${userData.login})`,
         status: 'approved',
+        solanaSignature
       }
+    });
+
+    // Set auth session cookie
+    const cookieStore = await cookies();
+    cookieStore.set('auth_session', JSON.stringify({ 
+      name: userData.name || userData.login, 
+      provider: 'github' 
+    }), {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7 // 1 week
     });
 
     // Send success message to parent window and close popup

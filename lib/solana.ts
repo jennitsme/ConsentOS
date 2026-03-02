@@ -78,6 +78,10 @@ export class SolanaService {
   getNotaryPublicKey(): string | null {
     return this.notaryKeypair?.publicKey.toBase58() || null;
   }
+
+  getExplorerUrl(signature: string): string {
+    return `https://explorer.solana.com/tx/${signature}`;
+  }
 }
 
 export const solanaService = new SolanaService();

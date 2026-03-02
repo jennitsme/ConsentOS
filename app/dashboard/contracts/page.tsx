@@ -1,16 +1,58 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { FileText, CheckCircle2, XCircle, Clock, ExternalLink, Search, Filter } from 'lucide-react';
 import * as motion from 'motion/react-client';
 
-const contracts = [
-  { id: 'C-8291', entity: 'Anthropic', type: 'Data Training', status: 'active', date: 'Oct 15, 2023', expires: 'Oct 15, 2024', hash: '0x8f...3d2a' },
-  { id: 'C-4720', entity: 'OpenAI', type: 'API Access', status: 'active', date: 'Sep 22, 2023', expires: 'Sep 22, 2024', hash: '0x1a...9b4c' },
-  { id: 'C-1053', entity: 'Midjourney', type: 'Image Generation', status: 'revoked', date: 'Aug 05, 2023', expires: 'Aug 05, 2024', hash: '0x4c...2e1f' },
-  { id: 'C-9921', entity: 'Grammarly', type: 'Text Analysis', status: 'expired', date: 'Jan 10, 2023', expires: 'Jul 10, 2023', hash: '0x9d...7a5b' },
-];
+interface Contract {
+  id: string;
+  appName: string;
+  status: string;
+  consentHash: string | null;
+  solanaSignature: string | null;
+  createdAt: string;
+}
 
 export default function ContractsPage() {
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchContracts = async () => {
+      try {
+        const res = await fetch('/api/dashboard/contracts');
+        if (res.ok) {
+          const data = await res.json();
+          setContracts(data.contracts || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch contracts:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchContracts();
+  }, []);
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const getExpirationDate = (dateString: string) => {
+    const date = new Date(dateString);
+    date.setFullYear(date.getFullYear() + 1); // Assuming 1 year expiration for demo
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -47,36 +89,66 @@ export default function ContractsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {contracts.map((contract, index) => (
-                <motion.tr 
-                  key={contract.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="hover:bg-white/[0.02] transition-colors"
-                >
-                  <td className="px-6 py-4 font-mono text-white">{contract.id}</td>
-                  <td className="px-6 py-4 font-medium text-white">{contract.entity}</td>
-                  <td className="px-6 py-4">{contract.type}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusStyles(contract.status)}`}>
-                      {getStatusIcon(contract.status)}
-                      {contract.status.charAt(0).toUpperCase() + contract.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-white">{contract.date}</span>
-                      <span className="text-xs text-zinc-500">{contract.expires}</span>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-zinc-500">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+                      Loading contracts...
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-emerald-400 hover:text-emerald-300 font-medium inline-flex items-center gap-1 transition-colors">
-                      View <ExternalLink className="w-3 h-3" />
-                    </button>
+                </tr>
+              ) : contracts.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-zinc-500">
+                    No contracts found.
                   </td>
-                </motion.tr>
-              ))}
+                </tr>
+              ) : (
+                contracts.map((contract, index) => (
+                  <motion.tr 
+                    key={contract.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="hover:bg-white/[0.02] transition-colors"
+                  >
+                    <td className="px-6 py-4 font-mono text-white">
+                      {contract.id.substring(0, 8).toUpperCase()}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-white">{contract.appName}</td>
+                    <td className="px-6 py-4">Data Access</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusStyles(contract.status)}`}>
+                        {getStatusIcon(contract.status)}
+                        {contract.status.charAt(0).toUpperCase() + contract.status.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-white">{formatDate(contract.createdAt)}</span>
+                        <span className="text-xs text-zinc-500">{getExpirationDate(contract.createdAt)}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {contract.solanaSignature ? (
+                        <a 
+                          href={`https://explorer.solana.com/tx/${contract.solanaSignature}?cluster=mainnet-beta`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-400 hover:text-emerald-300 font-medium inline-flex items-center gap-1 transition-colors"
+                        >
+                          View <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <button className="text-emerald-400 hover:text-emerald-300 font-medium inline-flex items-center gap-1 transition-colors">
+                          View <ExternalLink className="w-3 h-3" />
+                        </button>
+                      )}
+                    </td>
+                  </motion.tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

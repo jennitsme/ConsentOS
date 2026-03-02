@@ -31,8 +31,10 @@ export default function Earnings() {
     try {
       const res = await fetch('/api/wallet');
       const result = await res.json();
-      if (result) {
+      if (result && typeof result.balance === 'number') {
         setData(result);
+      } else {
+        console.error('Invalid wallet data received:', result);
       }
     } catch (error) {
       console.error('Failed to fetch wallet data:', error);
