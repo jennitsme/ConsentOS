@@ -19,9 +19,9 @@ export default function Login() {
       }
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
         // Force a small delay to ensure cookie is set
-        await new Promise(resolve => setTimeout(resolve, 500));
-        router.push('/dashboard');
-        router.refresh(); // Force a refresh to ensure layout gets new session
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 300);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -38,7 +38,11 @@ export default function Login() {
         body: JSON.stringify({ email }),
       });
       if (res.ok) {
-        router.push('/dashboard');
+        // Use a hard redirect for better reliability on mobile browsers
+        // and ensure the session cookie is fully recognized by the server
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 100);
       } else {
         setIsLoading(false);
         alert('Failed to login with email.');
@@ -85,7 +89,10 @@ export default function Login() {
         });
         
         if (res.ok) {
-          router.push('/dashboard');
+          // Use a hard redirect for better reliability on mobile browsers
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 100);
         } else {
           alert('Failed to authenticate wallet.');
         }

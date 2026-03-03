@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Shield, Lock, Unlock, DollarSign, Search, Filter, AlertCircle, Loader2, Fingerprint } from 'lucide-react';
 import * as motion from 'motion/react-client';
+import { useWallet } from '@solana/wallet-adapter-react';
+import bs58 from 'bs58';
 
 type PermissionLevel = 'denied' | 'restricted' | 'monetized';
 
@@ -21,6 +23,7 @@ export default function DataPermissions() {
   const [data, setData] = useState<DataCategory[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const { publicKey, signMessage } = useWallet();
 
   useEffect(() => {
     fetchPermissions();
@@ -41,15 +44,36 @@ export default function DataPermissions() {
   };
 
   const updatePermission = async (id: string, newLevel: PermissionLevel, price?: number) => {
-    // Optimistic update
-    const oldData = [...data];
-    setData(data.map(item => item.id === id ? { ...item, level: newLevel, price: price ?? item.price } : item));
+    if (!publicKey || !signMessage) {
+      alert('Please connect your Web3 wallet to sign this consent update.');
+      return;
+    }
 
     try {
+      // 1. Create a message to sign
+      const message = new TextEncoder().encode(
+        `ConsentOS: Update permission for ${id} to ${newLevel}${price ? ` at $${price}/1k` : ''}\nTimestamp: ${Date.now()}`
+      );
+
+      // 2. Request signature from wallet
+      const signatureBytes = await signMessage(message);
+      const signature = bs58.encode(signatureBytes);
+
+      // Optimistic update
+      const oldData = [...data];
+      setData(data.map(item => item.id === id ? { ...item, level: newLevel, price: price ?? item.price } : item));
+
+      // 3. Send to backend with signature
       const res = await fetch('/api/data-permissions', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, level: newLevel, price }),
+        body: JSON.stringify({ 
+          id, 
+          level: newLevel, 
+          price,
+          walletAddress: publicKey.toString(),
+          signature
+        }),
       });
       
       if (!res.ok) throw new Error('Failed to update');
@@ -59,7 +83,8 @@ export default function DataPermissions() {
       setData(data.map(item => item.id === id ? { ...item, ...updatedRes.category } : item));
     } catch (error) {
       console.error('Failed to update permission:', error);
-      setData(oldData); // Rollback
+      alert('Failed to sign or update permission. Please try again.');
+      fetchPermissions(); // Rollback by refetching
     }
   };
 

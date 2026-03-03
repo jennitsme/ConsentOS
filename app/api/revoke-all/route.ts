@@ -3,8 +3,10 @@ import { prisma } from '@/lib/prisma';
 import { solanaService } from '@/lib/solana';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const body = await request.json().catch(() => ({}));
+    const { walletAddress, signature } = body;
     let user = await getCurrentUser();
     if (!user) {
       user = await prisma.user.findFirst();
@@ -29,8 +31,9 @@ export async function POST() {
       data: {
         userId: user.id,
         appName: 'System',
-        action: 'REVOKED ALL DATA ACCESS AND CONNECTIONS',
-        status: 'blocked'
+        action: `REVOKED ALL DATA ACCESS AND CONNECTIONS. Signed by ${walletAddress ? walletAddress.substring(0, 8) + '...' : 'User'}.`,
+        status: 'blocked',
+        solanaSignature: signature
       }
     });
 

@@ -129,8 +129,8 @@ export async function GET(request: Request) {
       }
     });
 
-    // Send success message to parent window and close popup
-    return new NextResponse(`
+    // Set auth session cookie
+    const response = new NextResponse(`
       <script>
         if (window.opener) {
           window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', provider: 'Twitter / X' }, '*');
@@ -141,6 +141,20 @@ export async function GET(request: Request) {
       </script>
       <p>Authentication successful. This window should close automatically.</p>
     `, { headers: { 'Content-Type': 'text/html' } });
+
+    response.cookies.set('auth_session', JSON.stringify({ 
+      id: user.id,
+      name: userInfo.name || userInfo.username, 
+      provider: 'twitter' 
+    }), {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7 // 1 week
+    });
+
+    return response;
 
   } catch (err: any) {
     console.error('OAuth callback error:', err);

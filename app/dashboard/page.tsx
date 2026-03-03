@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { ShieldAlert, ShieldCheck, ShieldX, Activity, Database, ArrowRight, Zap, Link as LinkIcon, CheckCircle2, X, Plus, Loader2 } from 'lucide-react';
 import * as motion from 'motion/react-client';
 import { AnimatePresence } from 'motion/react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import bs58 from 'bs58';
 
 export default function DashboardOverview() {
   const [isRevoking, setIsRevoking] = useState(false);
@@ -16,6 +18,7 @@ export default function DashboardOverview() {
   const [connections, setConnections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const { publicKey, signMessage } = useWallet();
 
   const fetchData = async () => {
     try {
@@ -80,10 +83,29 @@ export default function DashboardOverview() {
       return;
     }
 
+    if (!publicKey || !signMessage) {
+      alert('Please connect your Web3 wallet to sign this revocation.');
+      return;
+    }
+
     setIsRevoking(true);
     try {
+      // 1. Create a message to sign
+      const message = new TextEncoder().encode(
+        `ConsentOS: REVOKE ALL DATA ACCESS AND CONNECTIONS\nTimestamp: ${Date.now()}`
+      );
+
+      // 2. Request signature from wallet
+      const signatureBytes = await signMessage(message);
+      const signature = bs58.encode(signatureBytes);
+
       const res = await fetch('/api/revoke-all', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: publicKey.toString(),
+          signature
+        })
       });
 
       if (res.ok) {
@@ -95,7 +117,7 @@ export default function DashboardOverview() {
       }
     } catch (error) {
       console.error('Error revoking all access:', error);
-      alert('Failed to revoke all access. Please try again.');
+      alert('Failed to sign or revoke all access. Please try again.');
     } finally {
       setIsRevoking(false);
     }

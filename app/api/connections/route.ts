@@ -11,34 +11,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Provider and status are required' }, { status: 400 });
     }
 
-    let user = await prisma.user.findFirst();
+    let user = await getCurrentUser();
     if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: 'dummy@example.com',
-          name: 'Dummy User',
-          provider: 'email',
-        }
-      });
+      user = await prisma.user.findFirst();
+      if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
     }
 
     // Helper to get default privacy scores and data counts
     const getProviderDefaults = (provider: string) => {
-      const defaults: Record<string, { score: number, count: number }> = {
-        'Google Workspace': { score: 85, count: 1240 },
-        'Twitter / X': { score: 62, count: 432 },
-        'Dropbox': { score: 78, count: 850 },
-        'Meta': { score: 45, count: 2100 },
-        'GitHub': { score: 92, count: 156 },
-        'LinkedIn': { score: 70, count: 320 },
-        'Spotify': { score: 80, count: 540 },
+      const defaults: Record<string, { score: number, count: number, categories: any[] }> = {
+        'Google Workspace': { 
+          score: 85, 
+          count: 1240,
+          categories: [
+            { name: 'Email Metadata', description: 'Sender, recipient, and timestamps of emails', level: 'restricted', price: 0.2 },
+            { name: 'Document Content', description: 'Text content from Google Docs', level: 'denied', price: 0 }
+          ]
+        },
+        'Twitter / X': { 
+          score: 62, 
+          count: 432,
+          categories: [
+            { name: 'Public Tweets', description: 'All public text posts on Twitter/X', level: 'monetized', price: 0.5 },
+            { name: 'Direct Messages', description: 'Private messages sent and received', level: 'denied', price: 0 }
+          ]
+        },
+        'GitHub': { 
+          score: 92, 
+          count: 156,
+          categories: [
+            { name: 'Public Repos', description: 'Public code repositories', level: 'monetized', price: 0.8 },
+            { name: 'Commit History', description: 'Metadata about code contributions', level: 'restricted', price: 0.3 }
+          ]
+        },
       };
-      return defaults[provider] || { score: 50, count: 100 };
+      return defaults[provider] || { score: 50, count: 100, categories: [] };
     };
 
-    const { score, count } = getProviderDefaults(provider);
+    const { score, count, categories } = getProviderDefaults(provider);
 
-    // Upsert connection: update jika sudah ada, create jika belum
+    // Upsert connection
     const connection = await prisma.connection.upsert({
       where: {
         userId_provider: {
@@ -62,6 +76,30 @@ export async function POST(request: Request) {
         dataCount: count,
       }
     });
+
+    // Create associated data categories if they don't exist
+    if (status === 'connected' && categories.length > 0) {
+      for (const cat of categories) {
+        const existing = await prisma.dataCategory.findUnique({
+          where: { userId_name: { userId: user.id, name: cat.name } }
+        });
+        
+        if (!existing) {
+          const consentHash = generateConsentHash(user.id, cat.name, cat.level);
+          await prisma.dataCategory.create({
+            data: {
+              userId: user.id,
+              name: cat.name,
+              description: cat.description,
+              source: provider,
+              level: cat.level,
+              price: cat.price,
+              consentHash
+            }
+          });
+        }
+      }
+    }
 
     // Record on Solana
     const solanaSignature = await solanaService.recordConsentOnChain(user.id, provider, status);

@@ -26,6 +26,8 @@ export default function Earnings() {
   const [isLoading, setIsLoading] = useState(true);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const fetchWalletData = async () => {
     setIsLoading(true);
     try {
@@ -40,6 +42,26 @@ export default function Earnings() {
       console.error('Failed to fetch wallet data:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSyncAndMonetize = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/simulate-usage', { method: 'POST' });
+      const result = await res.json();
+      if (result.success) {
+        await fetchWalletData();
+        if (result.transactions.length > 0) {
+          alert(`Success! Your data was used by AI companies. You earned $${result.transactions.reduce((acc: number, tx: any) => acc + tx.amount, 0).toFixed(2)}!`);
+        } else {
+          alert(result.message);
+        }
+      }
+    } catch (error) {
+      console.error('Sync failed:', error);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -87,7 +109,15 @@ export default function Earnings() {
           <h1 className="text-3xl font-display font-bold tracking-tight text-white">Earnings</h1>
           <p className="text-zinc-400 mt-1">Track and withdraw your data monetization revenue.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button 
+            onClick={handleSyncAndMonetize}
+            disabled={isSyncing}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50"
+          >
+            {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {isSyncing ? 'Syncing...' : 'Sync & Monetize'}
+          </button>
           <button 
             onClick={handleWithdraw}
             disabled={isWithdrawing || data.balance <= 0}

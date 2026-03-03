@@ -4,57 +4,19 @@ import { generateConsentHash } from '@/lib/hashing';
 import { solanaService } from '@/lib/solana';
 import { getCurrentUser } from '@/lib/auth';
 
-const INITIAL_CATEGORIES = [
-  { name: 'Public Tweets', description: 'All public text posts on Twitter/X', source: 'Twitter', level: 'monetized', price: 0.5 },
-  { name: 'Private Photos', description: 'Photos stored in Google Photos', source: 'Google', level: 'denied', price: 0 },
-  { name: 'Voice Notes', description: 'Audio recordings from WhatsApp', source: 'Meta', level: 'denied', price: 0 },
-  { name: 'Code Repositories', description: 'Public code on GitHub', source: 'GitHub', level: 'restricted', price: 0 },
-  { name: 'Blog Posts', description: 'Articles published on Medium', source: 'Medium', level: 'monetized', price: 1.2 },
-];
-
 export async function GET() {
   try {
     let user = await getCurrentUser();
     if (!user) {
-      // For development, if no session, fallback to first user or create one
       user = await prisma.user.findFirst();
       if (!user) {
-        user = await prisma.user.create({
-          data: {
-            email: 'user@example.com',
-            name: 'Default User',
-            provider: 'email',
-          }
-        });
+        return NextResponse.json({ categories: [] });
       }
     }
 
-    let categories = await prisma.dataCategory.findMany({
+    const categories = await prisma.dataCategory.findMany({
       where: { userId: user.id }
     });
-
-    // Initialize if empty
-    if (categories.length === 0) {
-      await Promise.all(INITIAL_CATEGORIES.map(async (cat) => {
-        const userId = user!.id;
-        const consentHash = generateConsentHash(userId, cat.name, cat.level);
-        
-        // Record on Solana (async, don't block initialization)
-        const solanaSignature = await solanaService.recordConsentOnChain(userId, cat.name, consentHash);
-
-        return prisma.dataCategory.create({
-          data: {
-            ...cat,
-            userId: userId,
-            consentHash,
-            solanaSignature
-          }
-        });
-      }));
-      categories = await prisma.dataCategory.findMany({
-        where: { userId: user.id }
-      });
-    }
 
     return NextResponse.json({ categories });
   } catch (error) {
@@ -65,7 +27,7 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    const { id, level, price } = await request.json();
+    const { id, level, price, walletAddress, signature } = await request.json();
     let user = await getCurrentUser();
     
     if (!user) {
@@ -95,14 +57,14 @@ export async function PATCH(request: Request) {
       }
     });
 
-    // Log the activity
+    // Log the activity with wallet signature proof
     await prisma.activityLog.create({
       data: {
         userId: user.id,
         appName: updated.source,
-        action: `Updated permission for ${updated.name} to ${level}. Contract Hash: ${newHash.substring(0, 12)}...`,
+        action: `Updated permission for ${updated.name} to ${level}. Signed by ${walletAddress ? walletAddress.substring(0, 8) + '...' : 'User'}.`,
         status: level === 'denied' ? 'blocked' : 'active',
-        solanaSignature
+        solanaSignature: signature || solanaSignature // Store the user's signature or the on-chain tx
       }
     });
 

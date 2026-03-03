@@ -3,15 +3,17 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ShieldCheck, LayoutDashboard, Database, Activity, Wallet, FileText, Settings, LogOut, User, Menu, X } from 'lucide-react';
+import { ShieldCheck, LayoutDashboard, Database, Activity, Wallet, FileText, Settings, LogOut, User, Menu, X, Code } from 'lucide-react';
 import * as motion from 'motion/react-client';
 import { AnimatePresence } from 'motion/react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<{ name: string; provider: string } | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -25,15 +27,38 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
+          setIsLoading(false);
         } else {
-          router.push('/login');
+          // On mobile, sometimes the first fetch fails due to cookie propagation
+          // Let's try one more time after a short delay before giving up
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const retryRes = await fetch('/api/auth/session');
+          if (retryRes.ok) {
+            const data = await retryRes.json();
+            setUser(data.user);
+            setIsLoading(false);
+          } else {
+            router.push('/login');
+          }
         }
       } catch (error) {
         console.error('Failed to fetch session', error);
+        router.push('/login');
       }
     };
     fetchSession();
   }, [router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+          <p className="text-zinc-500 text-sm animate-pulse font-medium">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleLogout = async () => {
     try {
@@ -98,9 +123,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="font-display font-bold text-lg tracking-tight text-white">ConsentOS</span>
             </div>
           </div>
-          <button onClick={handleLogout} className="p-2 text-zinc-400 hover:text-white">
-            <LogOut className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <WalletMultiButton style={{ height: '36px', padding: '0 12px', fontSize: '12px', backgroundColor: '#10b981', color: '#09090b', fontWeight: 'bold' }} />
+            <button onClick={handleLogout} className="p-2 text-zinc-400 hover:text-white">
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-10">
@@ -121,6 +149,10 @@ function SidebarContent({ user, onLogout }: { user: { name: string; provider: st
         <span className="font-display font-bold text-xl tracking-tight text-white">ConsentOS</span>
       </div>
       
+      <div className="p-4 border-b border-white/5">
+        <WalletMultiButton style={{ width: '100%', justifyContent: 'center', backgroundColor: '#10b981', color: '#09090b', fontWeight: 'bold' }} />
+      </div>
+
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4 mt-4 px-3">Overview</div>
         <NavLink href="/dashboard" icon={<LayoutDashboard className="w-4 h-4" />}>Dashboard</NavLink>
@@ -131,6 +163,9 @@ function SidebarContent({ user, onLogout }: { user: { name: string; provider: st
         <NavLink href="/dashboard/wallet" icon={<Wallet className="w-4 h-4" />}>Earnings</NavLink>
         <NavLink href="/dashboard/contracts" icon={<FileText className="w-4 h-4" />}>Contracts</NavLink>
         
+        <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4 mt-8 px-3">Developers</div>
+        <NavLink href="/dashboard/compliance" icon={<Code className="w-4 h-4" />}>Compliance API</NavLink>
+
         <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4 mt-8 px-3">Settings</div>
         <NavLink href="/dashboard/settings" icon={<Settings className="w-4 h-4" />}>Preferences</NavLink>
       </nav>

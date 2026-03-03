@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: Request) {
   try {
@@ -8,10 +9,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing wallet address' }, { status: 400 });
     }
 
+    // Find or create user by wallet address (providerId)
+    let user = await prisma.user.findUnique({
+      where: { providerId: address }
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          name: `${address.substring(0, 4)}...${address.substring(address.length - 4)}`,
+          provider: 'wallet',
+          providerId: address,
+        }
+      });
+    }
+
     const response = NextResponse.json({ success: true });
 
-    // Set a simple session cookie
-    response.cookies.set('auth_session', JSON.stringify({ name: address, provider: 'wallet' }), {
+    // Set a robust session cookie including the user ID
+    response.cookies.set('auth_session', JSON.stringify({ 
+      id: user.id,
+      name: user.name, 
+      provider: 'wallet' 
+    }), {
       httpOnly: true,
       secure: true,
       sameSite: 'none',

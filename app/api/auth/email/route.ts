@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: Request) {
   try {
@@ -8,10 +9,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
+    // Find or create user
+    let user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email,
+          name: email.split('@')[0],
+          provider: 'email',
+        }
+      });
+    }
+
     const response = NextResponse.json({ success: true });
 
-    // Set a simple session cookie
-    response.cookies.set('auth_session', JSON.stringify({ name: email, provider: 'email' }), {
+    // Set a robust session cookie including the user ID
+    response.cookies.set('auth_session', JSON.stringify({ 
+      id: user.id,
+      name: user.name, 
+      provider: 'email' 
+    }), {
       httpOnly: true,
       secure: true,
       sameSite: 'none',

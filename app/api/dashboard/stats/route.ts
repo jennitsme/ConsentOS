@@ -37,14 +37,11 @@ export async function GET() {
     const avgPrivacyScore = connections.length > 0 
       ? Math.round(connections.reduce((acc, conn) => acc + conn.privacyScore, 0) / connections.length)
       : 0;
-    
-    // Fallback to activity-based calculation if no connections
-    const dataPoints = totalDataPoints || (activityCount * 150);
 
     return NextResponse.json({
       activePermissions: activePermissions,
-      dataPoints: dataPoints,
-      privacyScore: avgPrivacyScore || 85 // Default score if no connections
+      dataPoints: totalDataPoints,
+      privacyScore: avgPrivacyScore
     });
   } catch (error) {
     console.error('Error fetching stats:', error);

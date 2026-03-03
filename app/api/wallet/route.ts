@@ -19,19 +19,6 @@ export async function GET() {
       }
     }
 
-    // Initialize with some dummy transactions if none exist
-    const txCount = await prisma.transaction.count({ where: { userId: user.id } });
-    if (txCount === 0) {
-      await prisma.transaction.createMany({
-        data: [
-          { userId: user.id, type: 'payment', source: 'Anthropic Claude', amount: 1.20, status: 'completed', createdAt: new Date() },
-          { userId: user.id, type: 'payment', source: 'OpenAI (GPT-4)', amount: 5.50, status: 'completed', createdAt: new Date(Date.now() - 86400000) },
-          { userId: user.id, type: 'withdrawal', source: 'Bank Account ending in 4211', amount: -50.00, status: 'completed', createdAt: new Date(Date.now() - 86400000 * 2) },
-          { userId: user.id, type: 'payment', source: 'Midjourney', amount: 0.80, status: 'completed', createdAt: new Date(Date.now() - 86400000 * 3) },
-        ]
-      });
-    }
-
     const transactions = await prisma.transaction.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' }
